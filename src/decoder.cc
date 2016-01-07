@@ -25,7 +25,7 @@ static void error_exit(j_common_ptr cinfo) {
   decoder->error(buffer);
 }
 
-JPEGDecoder::JPEGDecoder() : callback(val::undefined()) {
+JPEGDecoder::JPEGDecoder() : callback(NULL) {
   dec.err = jpeg_std_error(&err);
   err.error_exit = error_exit;
   jpeg_create_decompress(&dec);
@@ -70,7 +70,9 @@ void JPEGDecoder::skipBytes(long numBytes) {
   bytesToSkip = std::max(numBytes - skip, 0L);
 }
 
-bool JPEGDecoder::decode(uint8_t *buffer, size_t length) {
+bool JPEGDecoder::decode(void *vbuffer, size_t length) {
+  uint8_t * buffer = (uint8_t *) vbuffer;
+
   int offset = data.size() - dec.src->bytes_in_buffer;
   
   data.erase(data.begin(), data.begin() + offset);
@@ -78,26 +80,32 @@ bool JPEGDecoder::decode(uint8_t *buffer, size_t length) {
   
   dec.src->bytes_in_buffer += length;
   dec.src->next_input_byte = &data[0];
+
   
   if (bytesToSkip)
     skipBytes(bytesToSkip);
     
   switch (state) {
     case JPEG_HEADER:
-      if (!readHeader())
+      if (!readHeader()) {
         return false;
+      }
       
     case JPEG_START_DECOMPRESS:
-      if (!startDecompress())
+      if (!startDecompress()) {
         return false;
+      }
       
     case JPEG_DECOMPRESS:
-      if (!decompress())
+      if (!decompress()) {
         return false;
+      }
       
     case JPEG_DONE:
-      return jpeg_finish_decompress(&dec);
-      
+      if (jpeg_finish_decompress(&dec)) {
+        return true;
+      }
+      return false;
     case JPEG_ERROR:
       return false;
   }
@@ -111,7 +119,6 @@ bool JPEGDecoder::readHeader() {
   
   imageWidth = dec.image_width;
   imageHeight = dec.image_height;
-  callback(std::string("inputSize"));
   
   state = JPEG_START_DECOMPRESS;
   return true;
@@ -134,7 +141,8 @@ bool JPEGDecoder::startDecompress() {
       break;
       
     default:
-      callback(std::string("error"), std::string("Unknown JPEG color space"));
+        if (callback != NULL)
+          callback->message("error", "Unknown JPEG color space");
       return false;
   }
   
@@ -149,7 +157,11 @@ bool JPEGDecoder::startDecompress() {
   jpeg_calc_output_dimensions(&dec);
   outputWidth = dec.output_width;
   outputHeight = dec.output_height;
-  callback(std::string("outputSize"));
+  if (callback != NULL) {
+    char buf[256];
+    sprintf(buf, "%dx%d", outputWidth, outputHeight);
+    callback->message("outputSize", buf);
+  }
   
   findExif();
   
@@ -166,7 +178,8 @@ bool JPEGDecoder::startDecompress() {
 void JPEGDecoder::findExif() {
   for (jpeg_saved_marker_ptr marker = dec.marker_list; marker; marker = marker->next) {
     if (marker->marker == EXIF_MARKER && marker->data_length >= 14 && !memcmp(marker->data, "Exif", 5)) {
-      callback(std::string("exif"), (unsigned int) marker->data, (size_t) marker->data_length);
+        if (callback != NULL)
+          callback->progress("exif", (unsigned int) marker->data, (size_t) marker->data_length);
     }
   }
 }
@@ -175,11 +188,11 @@ bool JPEGDecoder::decompress() {
   while (dec.output_scanline < dec.output_height) {
     if (jpeg_read_scanlines(&dec, &output, 1) != 1)
       return false;
-    
-    callback(std::string("scanline"), (unsigned int) output, (size_t) (dec.output_width * dec.output_components));
+    if (callback != NULL)
+      callback->progress("scanline", (unsigned int) output, (size_t) (dec.output_width * dec.output_components));
   }
-  
-  callback(std::string("end"));
+  if (callback != NULL)
+    callback->progress("end", 0, 0);
   
   state = JPEG_DONE;
   return true;
@@ -187,5 +200,7 @@ bool JPEGDecoder::decompress() {
 
 void JPEGDecoder::error(char *message) {
   state = JPEG_ERROR;
-  callback(std::string("error"), std::string(message));
+  if (callback != NULL)
+    callback->message("error", message);
 }
+

@@ -1,3 +1,6 @@
+#ifndef JPEGDECODER_H
+#define JPEGDECODER_H
+
 extern "C" {
 #include <stdio.h>
 #include <jpeglib.h>
@@ -5,10 +8,10 @@ extern "C" {
 
 #include <vector>
 #include <string>
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
 
-using namespace emscripten;
+#include "callback.h"
+
+
 
 enum JPEGState {
   JPEG_HEADER,
@@ -18,19 +21,20 @@ enum JPEGState {
   JPEG_ERROR
 };
 
+
 class JPEGDecoder {
 public:
+
   JPEGDecoder();
   ~JPEGDecoder();
+
   void setDesiredSize(int dw, int dh) {
     desiredWidth = dw;
     desiredHeight = dh;
   }
   void skipBytes(long numBytes);
-  bool decode(uint8_t *buffer, size_t length);
-  bool decodeStr(std::string buf) {
-    return decode((uint8_t *) buf.data(), buf.size());
-  }
+  bool decode(void *buffer, size_t length);
+
   
   int getWidth() const {
     return outputWidth;
@@ -40,27 +44,24 @@ public:
     return outputHeight;
   }
   
-  val getCallback() const {
+  EventCallback* getCallback() const {
     return callback;
   }
   
-  void setCallback(val cb) {
+  void setCallback(EventCallback* cb) {
     callback = cb;
   }
   
-  std::string getColorSpace() const {    
+  const char * getColorSpace() const {    
     switch (dec.out_color_space) {
       case JCS_RGB:
-        return std::string("rgb");
-        
+        return "rgb";
       case JCS_GRAYSCALE:
-        return std::string("gray");
-        
+        return "gray";
       case JCS_CMYK:
-        return std::string("cmyk");
-        
+        return "cmyk";
       default:
-        return std::string("rgb");
+        return "rgb";
     }
   }
   
@@ -81,17 +82,7 @@ private:
   uint8_t *output;
   int bytesToSkip;
   std::vector<uint8_t> data;
-  val callback;
+  EventCallback* callback;
 };
 
-EMSCRIPTEN_BINDINGS(decoder) {
-  class_<JPEGDecoder>("JPEGDecoder")
-    .constructor()
-    .property("callback", &JPEGDecoder::getCallback, &JPEGDecoder::setCallback)
-    .function("setDesiredSize", &JPEGDecoder::setDesiredSize)
-    .property("width", &JPEGDecoder::getWidth)
-    .property("height", &JPEGDecoder::getHeight)
-    .property("colorSpace", &JPEGDecoder::getColorSpace)
-    .function("decode", &JPEGDecoder::decodeStr)
-    ;
-}
+#endif

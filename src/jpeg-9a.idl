@@ -1,0 +1,46 @@
+
+
+interface JPEGEncoder {
+  void JPEGEncoder();
+  void emptyOutput();
+  void end();
+  void encode(any buffer, unsigned long length);
+  [Const] long getWidth();
+  void setWidth(long w);
+  [Const] long getHeight();
+  void setHeight(long h);
+  [Const] long getQuality();
+  void setQuality(long q);
+  [Const] DOMString getColorSpace();
+  void setColorSpace(DOMString cs);
+  [Const] EventCallback getCallback();
+  void setCallback(EventCallback evt);
+};
+
+
+
+interface EventCallback {
+};
+[JSImplementation="EventCallback"]
+interface JsEventCallback {
+    void JsEventCallback();
+    void progress([Const] DOMString msyType, unsigned long output, unsigned long bufSize);
+    void message([Const] DOMString msgType, [Const] DOMString msg);
+};
+
+
+interface JPEGDecoder {
+  void JPEGDecoder();
+  void setDesiredSize(long dw, long dh);
+  void skipBytes(long numBytes);
+  //boolean decodeStr(DOMString buf);
+  boolean decode(any buffer, unsigned long length);
+
+  [Const] long getWidth();
+  [Const] long getHeight();
+  EventCallback getCallback();
+  void setCallback(EventCallback cb);
+  [Const] DOMString getColorSpace();
+};
+
+

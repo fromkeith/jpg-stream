@@ -5,26 +5,43 @@ var PixelStream = require('pixel-stream');
 
 function JPEGEncoder(width, height, opts) {
   PixelStream.apply(this, arguments);
-  if (typeof width === 'object')
+  if (typeof width === 'object') {
     opts = width;
-  
-  this.encoder = new Encoder;
+    width = undefined;
+    height = undefined;
+  }
+
+  this.encoderOpts = {
+    quality: (opts ? opts.quality : 100),
+    width: width || (opts ? opts.width : undefined),
+    height: height || (opts ? opts.height : undefined)
+  };
+
+  this.encoder = new Encoder();
   this.ended = false;
-        
+
   var self = this;
-  this.encoder.callback = function(type, ptr, len) {
+  var callback = new jpeg.JsEventCallback();
+  callback.progress = function(typePtr, ptr, len) {
+    var type = jpeg.Pointer_stringify(typePtr);
     switch (type) {
       case 'data':
         self.push(new Buffer(jpeg.HEAPU8.subarray(ptr, ptr + len)));
         break;
-        
-      case 'error':
-        self.ended = true;
-        self.encoder.delete();
-        self.emit('error', new Error(ptr));
-        break;
     }
   };
+  callback.message = function (typePtr, msgPtr) {
+      var type = jpeg.Pointer_stringify(typePtr);
+      var msg = jpeg.Pointer_stringify(msgPtr);
+      switch (type) {
+        case 'error':
+          self.ended = true;
+          jpeg.destroy(self.encoder);
+          self.emit('error', new Error(msg));
+          break;
+      }
+  };
+  this.encoder.setCallback(callback);
 }
 
 util.inherits(JPEGEncoder, PixelStream);
@@ -32,19 +49,22 @@ util.inherits(JPEGEncoder, PixelStream);
 JPEGEncoder.prototype.supportedColorSpaces = ['rgb', 'gray', 'cmyk'];
 
 JPEGEncoder.prototype._start = function(done) {
-  this.encoder.width = this.format.width;
-  this.encoder.height = this.format.height;
-  this.encoder.colorSpace = this.format.colorSpace;
-  this.encoder.quality = this.format.quality || 100;
+  this.encoder.setWidth(this.encoderOpts.width || this.format.width);
+  this.encoder.setHeight(this.encoderOpts.height || this.format.height);
+  this.encoder.setColorSpace(this.encoderOpts.colorSpace || this.format.colorSpace);
+  this.encoder.setQuality(this.encoderOpts.quality || this.format.quality || 100);
   done();
 };
 
 JPEGEncoder.prototype._writePixels = function(data, done) {
   if (!this.ended) {
     var buf = data instanceof Uint8Array ? data : new Uint8Array(data);
-    this.encoder.encode(buf);
+
+    var nativeBuf = jpeg._malloc(buf.byteLength*buf.BYTES_PER_ELEMENT);
+    jpeg.HEAPU8.set(buf, nativeBuf);
+    var res = this.encoder.encode(nativeBuf, buf.byteLength)
+    jpeg._free(nativeBuf);
   }
-  
   done();
 };
 
@@ -52,7 +72,7 @@ JPEGEncoder.prototype._endFrame = function(done) {
   if (!this.ended) {
     this.ended = true;
     this.encoder.end();
-    this.encoder.delete();
+    jpeg.destroy(this.encoder);
   }
   
   done();

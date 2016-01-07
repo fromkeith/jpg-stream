@@ -6,43 +6,55 @@ var exif = require('exif-reader');
 
 function JPEGDecoder(opts) {
   Transform.call(this);
-  this.decoder = new Decoder;
+  this.decoder = new Decoder();
   
   if (opts && opts.width && opts.height)
     this.decoder.setDesiredSize(opts.width, opts.height);
     
   var self = this;
-  this.decoder.callback = function(type, ptr, len) {
-    switch (type) {
-      case 'outputSize':
-        self.format = {
-          width: self.decoder.width,
-          height: self.decoder.height,
-          colorSpace: self.decoder.colorSpace
-        };
+  var callback = new jpeg.JsEventCallback();
+  callback.progress = function(typePtr, ptr, len) {
+    var type = jpeg.Pointer_stringify(typePtr);
+      //console.log('progress:', type, ptr, len);
+      switch (type) {
         
-        self.emit('format', self.format);
-        break;
-        
-      case 'exif':
-        var buf = new Buffer(jpeg.HEAPU8.subarray(ptr, ptr + len));
-        self.emit('meta', exif(buf));
-        break;
-        
-      case 'scanline':
-        self.push(new Buffer(jpeg.HEAPU8.subarray(ptr, ptr + len)));
-        break;
-        
-      case 'end':
-        self.push(null);
-        break;
-        
-      case 'error':
-        self.decoder.delete();
-        self.emit('error', new Error(ptr));
-        break;
-    }
-  };
+          
+        case 'exif':
+          var buf = new Buffer(jpeg.HEAPU8.subarray(ptr, ptr + len));
+          self.emit('meta', exif(buf));
+          break;
+          
+        case 'scanline':
+          var buf = new Buffer(jpeg.HEAPU8.subarray(ptr, ptr + len));
+          self.push(buf);
+          break;
+          
+        case 'end':
+          self.push(null);
+          break;
+      }
+    };
+  callback.message = function (typePtr, msgPtr) {
+      var type = jpeg.Pointer_stringify(typePtr);
+      var msg = jpeg.Pointer_stringify(msgPtr);
+      //console.log('message:', type, msg);
+      switch (type) {
+        case 'error':
+          jpeg.destroy(self.decoder);
+          self.emit('error', new Error(msg));
+          break;
+        case 'outputSize':
+          self.format = {
+            width: self.decoder.getWidth(),
+            height: self.decoder.getHeight(),
+            colorSpace: self.decoder.getColorSpace()
+          };
+          console.log('colorSpace', self.format.colorSpace);
+          self.emit('format', self.format);
+          break;
+      }
+    };
+  this.decoder.setCallback(callback);
 }
 
 util.inherits(JPEGDecoder, Transform);
@@ -53,12 +65,17 @@ JPEGDecoder.probe = function(buf) {
 
 JPEGDecoder.prototype._transform = function(data, encoding, done) {
   var buf = data instanceof Uint8Array ? data : new Uint8Array(data);
-  this.decoder.decode(buf);
+
+  var nativeBuf = jpeg._malloc(buf.byteLength*buf.BYTES_PER_ELEMENT);
+  jpeg.HEAPU8.set(buf, nativeBuf);
+  var res = this.decoder.decode(nativeBuf, buf.byteLength)
+  jpeg._free(nativeBuf);
+
   done();
 };
 
 JPEGDecoder.prototype._flush = function(done) {
-  this.decoder.delete();
+  jpeg.destroy(this.decoder);
   done();
 };
 

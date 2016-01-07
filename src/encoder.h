@@ -1,3 +1,7 @@
+
+#ifndef JPEGENCODER_H
+#define JPEGENCODER_H
+
 extern "C" {
 #include <stdio.h>
 #include <jpeglib.h>
@@ -6,21 +10,22 @@ extern "C" {
 #include <vector>
 #include <string>
 
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
+//#include <emscripten/val.h>
+//#include <emscripten/bind.h>
 
-using namespace emscripten;
+#include "callback.h"
+
+//using namespace emscripten;
 
 class JPEGEncoder {
 public:
   JPEGEncoder();
   ~JPEGEncoder();
-  void encode(uint8_t *buffer, size_t length);
+  
+
+  void encode(void *buffer, size_t length);
   void emptyOutput();
   void end();
-  void encodeStr(std::string buf) {
-    encode((uint8_t *) buf.data(), buf.size());
-  }
   
   int getWidth() const {
     return enc.image_width;
@@ -46,22 +51,22 @@ public:
     quality = q;
   }
   
-  std::string getColorSpace() const {
+  const char * getColorSpace() const {
     switch (enc.in_color_space) {
       case JCS_RGB:
-        return std::string("rgb");
+        return "rgb";
         
       case JCS_GRAYSCALE:
-        return std::string("gray");
+        return "gray";
         
       case JCS_CMYK:
-        return std::string("cmyk");
+        return "cmyk";
         
       default:
-        return std::string("rgb");
+        return "rgb";
     }
   }
-  
+ 
   void setColorSpace(std::string cs) {
     if (cs.compare("gray") == 0) {
       enc.input_components = 1;
@@ -77,11 +82,11 @@ public:
     scanlineLength = enc.image_width * enc.input_components;
   }
   
-  val getCallback() const {
+  EventCallback * getCallback() const {
     return callback;
   }
 
-  void setCallback(val cb) {
+  void setCallback(EventCallback *cb) {
     callback = cb;
   }
   
@@ -93,22 +98,12 @@ private:
     
   int quality;
   std::string colorSpace;
-  val callback;
+  EventCallback *callback;
   bool decoding;
   int scanlineLength;
   std::vector<uint8_t> buf;
   uint8_t *output;
 };
 
-EMSCRIPTEN_BINDINGS(encoder) {
-  class_<JPEGEncoder>("JPEGEncoder")
-    .constructor()
-    .property("callback", &JPEGEncoder::getCallback, &JPEGEncoder::setCallback)
-    .property("width", &JPEGEncoder::getWidth, &JPEGEncoder::setWidth)
-    .property("height", &JPEGEncoder::getHeight, &JPEGEncoder::setHeight)
-    .property("quality", &JPEGEncoder::getQuality, &JPEGEncoder::setQuality)
-    .property("colorSpace", &JPEGEncoder::getColorSpace, &JPEGEncoder::setColorSpace)
-    .function("encode", &JPEGEncoder::encodeStr)
-    .function("end", &JPEGEncoder::end)
-    ;
-}
+
+#endif

@@ -20,7 +20,7 @@ static void error_exit(j_common_ptr cinfo) {
   encoder->error(buffer);
 }
 
-JPEGEncoder::JPEGEncoder() : callback(val::undefined()) {
+JPEGEncoder::JPEGEncoder() : callback(NULL) {
   enc.err = jpeg_std_error(&err);
   err.error_exit = error_exit;
   jpeg_create_compress(&enc);
@@ -56,7 +56,8 @@ JPEGEncoder::~JPEGEncoder() {
     free(output);
 }
 
-void JPEGEncoder::encode(uint8_t *buffer, size_t length) {
+void JPEGEncoder::encode(void *vbuffer, size_t length) {
+  uint8_t * buffer = (uint8_t *)vbuffer;
   if (!decoding) {
     jpeg_set_defaults(&enc);
     jpeg_set_quality(&enc, quality, TRUE);
@@ -77,7 +78,8 @@ void JPEGEncoder::encode(uint8_t *buffer, size_t length) {
 }
 
 void JPEGEncoder::emptyOutput() {
-  callback(std::string("data"), (unsigned int) output, (size_t) BUF_SIZE);
+  if (callback != NULL)
+    callback->progress("data", (unsigned int) output, (size_t) BUF_SIZE);
   enc.dest->next_output_byte = output;
   enc.dest->free_in_buffer = BUF_SIZE;
 }
@@ -86,10 +88,14 @@ void JPEGEncoder::end() {
   jpeg_finish_compress(&enc);
   
   size_t remaining = BUF_SIZE - enc.dest->free_in_buffer;
-  if (remaining > 0)
-    callback(std::string("data"), (unsigned int) output, remaining);
+  if (remaining > 0 && callback != NULL)
+    callback->progress("data", (unsigned int) output, remaining);
 }
 
 void JPEGEncoder::error(char *message) {
-  callback(std::string("error"), std::string(message));
+  if (callback == NULL) {
+    return;
+  }
+  callback->message("error", message);
 }
+
