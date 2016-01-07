@@ -3,6 +3,19 @@
 A streaming JPEG encoder and decoder for Node and the browser. It is a direct compilation
 of [libjpeg](http://www.ijg.org) to JavaScript using [Emscripten](http://emscripten.org/).
 
+
+## This Fork
+This is a fork of https://github.com/devongovett/jpg-stream. The ultimate goal of this fork is to allow
+this code to run as part of a Chrome App.
+
+It differs from the source repo in a few ways:
+
+  * No longer use emscripten bind. (Removed --bind)
+  * Turned on the NO_DYNAMIC_EXECUTION flag.
+  * I compiled emscripten with Ubuntu not OSX, so the Makefile no longer uses *.dylib, but *.so
+  * Uses WebIdl for binding instead.
+
+
 ## Installation
 
     npm install jpg-stream
