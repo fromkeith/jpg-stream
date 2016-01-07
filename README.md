@@ -18,9 +18,11 @@ It differs from the source repo in a few ways:
 
 ## Installation
 
-    npm install jpg-stream
+TODO: Allow someone to just check this out using npm.
 
-For the browser, you can build using [Browserify](http://browserify.org/).
+1. Checkout repo.
+2. Get Emscripten installed on your system.
+3. Run 'make' in the root of this repo.
 
 ## Decoding
 
