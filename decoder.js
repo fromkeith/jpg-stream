@@ -12,8 +12,8 @@ function JPEGDecoder(opts) {
     this.decoder.setDesiredSize(opts.width, opts.height);
     
   var self = this;
-  var callback = new jpeg.JsEventCallback();
-  callback.progress = function(typePtr, ptr, len) {
+  self.decoderCallback = new jpeg.JsEventCallback();
+  self.decoderCallback.progress = function progresFunc(typePtr, ptr, len) {
     var type = jpeg.Pointer_stringify(typePtr);
       //console.log('progress:', type, ptr, len);
       switch (type) {
@@ -34,13 +34,14 @@ function JPEGDecoder(opts) {
           break;
       }
     };
-  callback.message = function (typePtr, msgPtr) {
+  self.decoderCallback.message = function messageFunc(typePtr, msgPtr) {
       var type = jpeg.Pointer_stringify(typePtr);
       var msg = jpeg.Pointer_stringify(msgPtr);
       //console.log('message:', type, msg);
       switch (type) {
         case 'error':
           jpeg.destroy(self.decoder);
+          jpeg.destroy(self.decoderCallback);
           self.emit('error', new Error(msg));
           break;
         case 'outputSize':
@@ -54,7 +55,7 @@ function JPEGDecoder(opts) {
           break;
       }
     };
-  this.decoder.setCallback(callback);
+  this.decoder.setCallback(self.decoderCallback);
 }
 
 util.inherits(JPEGDecoder, Transform);
@@ -76,6 +77,7 @@ JPEGDecoder.prototype._transform = function(data, encoding, done) {
 
 JPEGDecoder.prototype._flush = function(done) {
   jpeg.destroy(this.decoder);
+  jpeg.destroy(this.decoderCallback);
   done();
 };
 

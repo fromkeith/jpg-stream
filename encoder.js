@@ -21,8 +21,8 @@ function JPEGEncoder(width, height, opts) {
   this.ended = false;
 
   var self = this;
-  var callback = new jpeg.JsEventCallback();
-  callback.progress = function(typePtr, ptr, len) {
+  self.encoderCallback = new jpeg.JsEventCallback();
+  self.encoderCallback.progress = function(typePtr, ptr, len) {
     var type = jpeg.Pointer_stringify(typePtr);
     switch (type) {
       case 'data':
@@ -30,18 +30,19 @@ function JPEGEncoder(width, height, opts) {
         break;
     }
   };
-  callback.message = function (typePtr, msgPtr) {
+  self.encoderCallback.message = function (typePtr, msgPtr) {
       var type = jpeg.Pointer_stringify(typePtr);
       var msg = jpeg.Pointer_stringify(msgPtr);
       switch (type) {
         case 'error':
           self.ended = true;
           jpeg.destroy(self.encoder);
+          jpeg.destroy(self.encoderCallback);
           self.emit('error', new Error(msg));
           break;
       }
   };
-  this.encoder.setCallback(callback);
+  this.encoder.setCallback(self.encoderCallback);
 }
 
 util.inherits(JPEGEncoder, PixelStream);
@@ -73,8 +74,8 @@ JPEGEncoder.prototype._endFrame = function(done) {
     this.ended = true;
     this.encoder.end();
     jpeg.destroy(this.encoder);
+    jpeg.destroy(this.encoderCallback);
   }
-  
   done();
 };
 
