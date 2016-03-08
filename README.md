@@ -14,6 +14,7 @@ It differs from the source repo in a few ways:
   * Turned on the NO_DYNAMIC_EXECUTION flag.
   * I compiled emscripten with Ubuntu not OSX, so the Makefile no longer uses *.dylib, but *.so
   * Uses WebIdl for binding instead.
+  * Turned on memory growth. This is supposed to slower according to the docs, but it allows me to decode more images.
 
 
 ## Installation
